@@ -1,7 +1,6 @@
 #pragma once
 #include <variant>
 #include <string>
+#include "QuickList.h"
 
-struct  CusQueue;
-
-using CusData = std::variant<int, std::string, CusQueue>;
+using CusData = std::variant<int, std::string, QuickList>;

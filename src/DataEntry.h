@@ -1,7 +1,6 @@
 #pragma once
 #include <string>
 #include <variant>
-#include "CusQueue.h"
 #include "CusData.h"
 
 enum DATA_TYPE
@@ -10,8 +9,6 @@ enum DATA_TYPE
     RDB_INT,
     RDB_QUEUE
 };
-
-
 
 struct DataEntry
 {

@@ -4,6 +4,7 @@
 void add_to_db(Dict& dict, const std::string& key,const CusData& value, int deaf ) {
     if (dict.rehasing && deaf == 0)
         rehash(dict);
+    DB("adding to db")
     add_to_db_inter(dict,key,value,deaf);
 }
 
@@ -40,29 +41,21 @@ std::string del_from_db(Dict&dict,const std::string& key)
 }
 
 // QeueNode 
-std::string get_queue_from_db(Dict& dict, const std::string& comm, const std::string& key) {
+std::string pop_from_queue_db(Dict& dict, const std::string& comm, const std::string& key) {
     auto headtup=get_from_db_inter(dict,key);
     DataEntry* entry=std::get<0>(headtup);
     if(entry==nullptr) {
         return "!!!NO QUEUE PRESENT!!!";
     } else {
-        if(std::holds_alternative<CusQueue>(entry->value)) {
-            CusQueue& queu=std::get<CusQueue>(entry->value);
+        if(std::holds_alternative<QuickList>(entry->value)) {
+            QuickList& queu=std::get<QuickList>(entry->value);
             CusData returnval;
             if ( comm=="LPOP")
             {
-                if(!cusqueue_pop_front(queu,returnval))
-                {
-                    return "!! NO ENTRY IN QUEUE !!";
-                }
-                return cusdata_to_string(returnval);
+                return queu.pop_front().value_or("[ERROR]");
                 
             } else if (comm=="RPOP") {
-                if(!cusqueue_pop_front(queu,returnval))
-                {
-                    return "!! NO ENTRY IN QUEUE !!";
-                }
-                return cusdata_to_string(returnval);
+                return  queu.pop_back().value_or("[ERROR]");
             }
         } else {
             return "Key exists but is not a queue";
@@ -76,26 +69,43 @@ std::string add_queue_to_db(Dict& dict, const std::string& comm, const std::stri
     DataEntry* entry = std::get<0>(headtup);
     if (entry==nullptr)
     {
-        CusListNode* newNode = new CusListNode{value, nullptr, nullptr};
-        CusQueue queu;
-        queu.head=newNode;
-        queu.tail=newNode;
-        add_to_db(dict,key,queu);
+        QuickList newList;
+        newList.push_back(cusdata_to_string(value));
+        add_to_db(dict,key,newList);
         DB("New queu added to the dict")
-    } else if (std::holds_alternative<CusQueue>(entry->value)) {
-        CusQueue& queu = std::get<CusQueue>(entry->value);
+    } else if (std::holds_alternative<QuickList>(entry->value)) {
+        QuickList& queu = std::get<QuickList>(entry->value);
         if (comm == "LPUSH") {
-            // Insert at head
-            cusqueue_push_front(queu,value);
+            queu.push_front(cusdata_to_string(value));
             return "Value LPUSHed to queue";
         } else if (comm == "RPUSH") {
-            // Insert at tail
-            cusqueue_push_back(queu,value);
+            queu.push_back(cusdata_to_string(value));
             return "Value RPUSHed to queue";
         }
     } else {
         return "Key exists but is not a queue";
     }
-    
     return "";
+}
+
+std::string get_from_queue_db(Dict& dict,const std::string& key,size_t index) {
+    auto headtup = get_from_db_inter(dict, key);
+    DataEntry* entry = std::get<0>(headtup);
+    if (std::holds_alternative<QuickList>(entry->value)) {
+        QuickList& queu = std::get<QuickList>(entry->value);
+        return queu.at(index).value_or("[ERROR]");
+    } else {
+        return "Key exists but is not a queue";
+    }
+}
+
+std::vector<std::string> get_range_from_queu_db(Dict&dict,const std::string& key,size_t st,size_t ed) {
+    auto headtup = get_from_db_inter(dict, key);
+    DataEntry* entry = std::get<0>(headtup);
+    if (std::holds_alternative<QuickList>(entry->value)) {
+        QuickList& queu = std::get<QuickList>(entry->value);
+        return queu.range(st,ed);
+    } else {
+        return {};
+    }
 }

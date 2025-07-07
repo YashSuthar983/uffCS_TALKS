@@ -160,6 +160,7 @@ size_t ListPack::get_element_content_len(const char* p) const {
     return 0;
 }
 
+// Returns how many bytes are used to encode the backlen at pointer p.
 size_t ListPack::get_decode_backlen_size(const char* p) const {
     size_t len = 1;
     const unsigned char* up = reinterpret_cast<const unsigned char*>(p);
@@ -178,6 +179,7 @@ size_t ListPack::get_encoded_backlen_size(size_t len) const {
     return 5;
 }
 
+// Decode the backlen from the pointer p.
 size_t ListPack::buffer_decode_backlen(const char* p) {
     size_t val = 0;
     size_t shift = 0;
@@ -203,22 +205,27 @@ char* ListPack::replace_bytes(char* pos, const std::string& str, bool is_inserti
     size_t prev_entry_backlen = 0;
 
     // size and layout of the NEW entry
+    
+    
+    if (static_cast<uint8_t>(pos[0]) == EOF_B) {
+        // push_back
+        if (get_num_elements() > 0) {
+            prev_entry_backlen =last_entry_size;
+        }
+    } else {
+        // push front
+        if (pos != (buffer + HEADER_SIZE)) {
+            prev_entry_backlen = buffer_decode_backlen(reinterpret_cast<const char*>(pos + get_element_content_len(pos)));
+        }
+    }
     size_t new_element_content_len = get_encoded_content_len(str);
     size_t new_back_len = get_encoded_backlen_size(prev_entry_backlen);
     size_t new_entry_len = new_element_content_len + new_back_len;
 
-    if (static_cast<uint8_t>(pos[0]) == EOF_B) {
-        // push_back
+    if(get_num_elements()==0) {
         last_entry_size= new_entry_len;
-        if (get_num_elements() > 0) {
-            prev_entry_backlen = get_full_entry_len(pos);
-        }
-    } else {
-        // push front
-        if (pos != buffer + HEADER_SIZE) {
-            prev_entry_backlen = buffer_decode_backlen(reinterpret_cast<const char*>(pos + get_element_content_len(pos)));
-        }
     }
+
 
     // memory shift needed
     size_t next_entry_backlen_delta = 0;
@@ -290,7 +297,11 @@ char* ListPack::erase_bytes(char* pos) {
         forward_entry_backlen_delta=new_forward_backlen-old_forward_backlen;
     }
     else {
-        last_entry_size=previos_entry_backlen;
+        if(get_num_elements() == 1) {
+            last_entry_size = 0;
+        } else {
+            last_entry_size = previos_entry_backlen;
+        }
     }
     
     // memory shift needed
@@ -313,36 +324,59 @@ char* ListPack::erase_bytes(char* pos) {
 
 std::optional<std::string> ListPack::pop_front() {
     char* first_ptr = buffer + HEADER_SIZE;
-    if(static_cast<uint8_t>(first_ptr[0])==EOF_B) return std::nullopt;
+    if(static_cast<uint8_t>(first_ptr[0])==EOF_B) {
+        last_entry_size=0;
+        DB("ListPack is empty, cannot pop front.");
+        return std::nullopt;
+    }
     std::optional<std::string> returnval=get_string(first_ptr);
-    erase_bytes(first_ptr);
+    // std::cout << "Popped front value: " << returnval.value_or("[error]") << std::endl;
+    if(get_num_elements() == 1) {
+        last_entry_size = 0;
+    }
+    if(!erase_bytes(first_ptr)) {
+        DB("Failed to erase the first entry in ListPack.");
+        return std::nullopt;
+    }
     return returnval;
 }
 
 std::optional<std::string> ListPack::pop_back() {
+    if(get_num_elements() == 0) return std::nullopt;
     char* last_backlen=buffer+get_total_bytes()-last_entry_size-1;
     if(static_cast<uint8_t>(last_backlen[0])==EOF_B) return std::nullopt;
     std::optional<std::string> returnval=get_string(last_backlen);
-    erase(last_backlen);
+    size_t last_backlen_size = buffer_decode_backlen(last_backlen + get_element_content_len(last_backlen));
+    if(get_num_elements() == 1) {
+        last_entry_size = 0;
+    }
+    if(!erase(last_backlen)) {
+        return std::nullopt;
+    }
+    last_entry_size=last_backlen_size;
     return returnval;
 }
 
 bool ListPack::push_back(const std::string& value) {
-    DB("Pushing to listpack")
+    DB("Pushing to listpack size: " + std::to_string(get_num_elements()));
     char* eof_ptr = buffer + get_total_bytes() - 1;
-    last_entry_size=static_cast<size_t>(insert(eof_ptr, value)-buffer);
-    last_entry_size=get_total_bytes()-last_entry_size-1;
-    // if(last_entry) entries++;
-    entries++;
+    char* new_entry_ptr = insert(eof_ptr, value);
+    if (!new_entry_ptr) {DB("NOT ABLE TO PUSH BACk")return false;}
+    last_entry_size = get_full_entry_len(new_entry_ptr);
+    char* man= find_entry_from_head(0); // Ensure the header is updated
+    std::cout<< "First entry after push_back: " << get_string(man).value_or("[error]") << std::endl;
+    DB("Last entry size after push_back: "+ std::to_string(last_entry_size));
     return true;
 }
 
 bool ListPack::push_front(const std::string& value) {
     char* first_ptr = buffer + HEADER_SIZE;
+    bool is_empty=(get_num_elements() == 0);
     char* first_entry=insert(first_ptr, value);
     if(!first_entry) return false;
-    if(entries==0) last_entry_size=first_entry-buffer;
-    entries++;
+    if(is_empty) {
+        last_entry_size = get_full_entry_len(first_entry);
+    }
     return true;
 }
 

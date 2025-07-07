@@ -3,16 +3,8 @@
 #include <variant>
 #include "CusData.h"
 
-enum DATA_TYPE
-{
-    RDB_STRING,
-    RDB_INT,
-    RDB_QUEUE
-};
-
 struct DataEntry
 {
-    DATA_TYPE type;
     std::string key;
     CusData value;
     DataEntry* prev;

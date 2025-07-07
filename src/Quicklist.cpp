@@ -43,9 +43,17 @@ std::optional<std::string> QuickList::pop_back() {
         return std::nullopt;
     }
     std::optional<std::string> result = tail->lp.pop_back();
-    if(tail->lp.get_num_elements()==0&& tail->prev!=nullptr)
+    total_size--;
+    if(tail->lp.get_num_elements()==0)
     {
-        tail=tail->prev;
+        Node* to_delete = tail;
+        if (tail->prev==nullptr) {
+            head = tail = nullptr;
+        } else {
+            tail = tail->prev;
+            tail->next = nullptr;
+        }
+        delete to_delete;
     }
     return result;
 }
@@ -55,9 +63,17 @@ std::optional<std::string> QuickList::pop_front() {
         return std::nullopt;
     }
     std::optional<std::string> result = head->lp.pop_front();
+    total_size--;
     if(head->lp.get_num_elements()==0)
     {
-        head=head->next;
+        Node* to_delete = head;
+        if (head->next==nullptr) {
+            head = tail = nullptr;
+        } else {
+            head = head->prev;
+            head->next = nullptr;
+        }
+        delete to_delete;
     }
     return result;
 }

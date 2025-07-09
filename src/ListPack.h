@@ -14,6 +14,7 @@ so a list pack can have max 256 elements and can go upto 512/memory execdes
 if 512 reached then split them into two . This is managed by quicklist 
 
 */
+#pragma once
 
 #include <iostream>
 #include <vector>
@@ -107,9 +108,7 @@ public:
     bool push_front(const std::string& value);
 
     char* find_entry_from_head(int index);
-
     std::optional<std::string> get_string(const char* p) const;
-
     std::vector<std::string> get_range(size_t st ,size_t ed);
     
     ~ListPack() {

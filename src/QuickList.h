@@ -7,8 +7,6 @@
 const size_t MAX_LISTPACK_ENTRIES = 256;
 const size_t MAX_LISTPACK_BYTES = 8192; // 8 KB
 
-
-
 class QuickList {
 public:
     struct Node {

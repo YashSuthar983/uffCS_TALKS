@@ -417,7 +417,7 @@ std::optional<std::string> ListPack::get_string(const char* p) const {
 }
 
 std::vector<std::string> ListPack::get_range(size_t st,size_t ed) {
-    if (st > ed || ed >= get_num_elements()) {
+    if (st > ed || ed > get_num_elements()) {
         return {};
     }
     std::vector<std::string> returnval;

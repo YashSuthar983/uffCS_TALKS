@@ -13,7 +13,6 @@
 
 
 
-
 #include <iostream>
 #include <cstdlib>
 #include <string>
@@ -43,7 +42,6 @@ enum ClientStatus {
     STATUS_NEEDS_CLOSE,
     STATUS_ERROR
 };
-// Command Handler
 
 PrasedCommand parse_cmd(std::string str)
 {
@@ -135,56 +133,6 @@ ClientStatus main_loop(int client_fd,Dict& dict)
     return STATUS_OK;
 }
 
-void test_db()
-{
-
-    Dict dictionary;
-    init_dict(dictionary);
-    dictionary.rehasing=false;
-    dictionary.rehasingIndex=-1;
-    
-    DB("-------------Adding to queu--------")
-    std::cout << add_queue_to_db(dictionary, "RPUSH", "hotel", "a") << std::endl;
-    std::cout << add_queue_to_db(dictionary, "RPUSH", "hotel", "b") << std::endl;
-    std::cout << add_queue_to_db(dictionary, "RPUSH", "hotel", "c") << std::endl;
-    std::cout << add_queue_to_db(dictionary, "RPUSH", "hotel", "d") << std::endl;
-
-    std::vector<std::string> range = get_range_from_queu_db(dictionary, "hotel", 0, 3);
-    for(auto&x:range)
-    {
-        std::cout<<x<<", ";
-    }
-    std::cout<<std::endl;
-    // // Simulating:
-    // // LPOP hotel (4 times)
-    std::cout << pop_from_queue_db(dictionary, "LPOP", "hotel") << std::endl; // d
-    std::cout << pop_from_queue_db(dictionary, "LPOP", "hotel") << std::endl; // c
-    std::cout << pop_from_queue_db(dictionary, "LPOP", "hotel") << std::endl; // b
-    std::cout << pop_from_queue_db(dictionary, "LPOP", "hotel") << std::endl; // a
-
-    // // Empty pop
-    std::cout << pop_from_queue_db(dictionary, "LPOP", "hotel") << std::endl; // [ERROR]
-
-    // // Rebuild queue
-    std::cout << add_queue_to_db(dictionary, "RPUSH", "hotel", "a") << std::endl;
-    std::cout << add_queue_to_db(dictionary, "LPUSH", "hotel", "b") << std::endl;
-    std::cout << add_queue_to_db(dictionary, "LPUSH", "hotel", "b") << std::endl;
-    std::cout << add_queue_to_db(dictionary, "LPUSH", "hotel", "bbb") << std::endl;
-    // std::vector<std::string> range1 = get_range_from_queu_db(dictionary, "hotel", 0, 1);
-    // for(auto&x:range1)
-    // {
-    //     std::cout<<x<<", ";
-    // }
-    // std::cout<<std::endl;
-    // // Now:
-    std::cout << pop_from_queue_db(dictionary, "LPOP", "hotel") << std::endl; // bbb
-    std::cout << pop_from_queue_db(dictionary, "LPOP", "hotel") << std::endl; // a
-    std::cout << pop_from_queue_db(dictionary, "LPOP", "hotel") << std::endl; // b
-    std::cout << pop_from_queue_db(dictionary, "LPOP", "hotel") << std::endl; // [ERROR]
-    std::cout << pop_from_queue_db(dictionary, "LPOP", "hotel") << std::endl; // [ERROR]
-    std::cout<<std::endl;
-}
-
 int main(int argc, char **argv) {
     std::cout << std::unitbuf;
     std::cerr << std::unitbuf;
@@ -247,9 +195,6 @@ int main(int argc, char **argv) {
     std::cout<<"Listening socket added to epoll"<<std::endl;
 
     Dict dictionary;
-    init_dict(dictionary);
-    dictionary.rehasing=false;
-    dictionary.rehasingIndex=-1;
 
     while (true)
     {

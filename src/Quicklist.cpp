@@ -102,7 +102,7 @@ std::optional<std::string> QuickList::at(size_t index) {
 }
 
 std::vector<std::string> QuickList::range(size_t st,size_t ed) {
-    if (st > ed || ed > total_size) {
+    if (st > ed || ed >= total_size) {
         return {"Give Proper range"};
     }
 

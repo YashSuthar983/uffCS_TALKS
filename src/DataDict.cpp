@@ -64,123 +64,149 @@ uint32_t murmur32(const std::string& key) {
     return hash;
 }
 
-void init_dict(Dict& dict, size_t size,int deaf) {
+void Dict::init_dict( size_t size,int deaf) {
 
-    if (dict.ht[deaf].table != nullptr) {
+    if (this->ht[deaf].table != nullptr) {
         DB("WARNING: init_hash_table called on an already allocated table[" + std::to_string(deaf) + "]. Ensure proper cleanup.");
     }
 
     DB("Initializing table ht[" + std::to_string(deaf) + "] with size: " + std::to_string(size));
-    dict.ht[deaf].table = (DataEntry**)calloc(size, sizeof(DataEntry*));
-    if (!dict.ht[deaf].table) {
+    this->ht[deaf].table = (DataEntry**)calloc(size, sizeof(DataEntry*));
+    if (!this->ht[deaf].table) {
         DB("ERROR: Failed to allocate memory for hash table[" + std::to_string(deaf) + "].");
         exit(EXIT_FAILURE);
     }
-    dict.ht[deaf].table_size = size;
-    dict.ht[deaf].table_size_mask = size - 1;
-    dict.ht[deaf].element_count = 0;
-    dict.ht[deaf].space_used = 0;
+    this->ht[deaf].table_size = size;
+    this->ht[deaf].table_size_mask = size - 1;
+    this->ht[deaf].element_count = 0;
 }
 
-void increaseHashTable()
+void Dict::increaseHashTable()
 {
     DEFAULT_TABLE_COUNT *= 2ll;
     DB("Increased Table Size = " + std::to_string(DEFAULT_TABLE_COUNT))
 }
 
-void rehash(Dict& dict)
+void Dict::rehash()
 {
-    dict.rehasingIndex++;
-    DataEntry* head = dict.ht[0].table[dict.rehasingIndex];
+    this->rehasingIndex++;
+    DataEntry* head = this->ht[0].table[this->rehasingIndex];
     while (head)
     {
         DataEntry* next_node = head->next;
-        add_to_db_inter(dict, head->key, head->value, 1); // Move to ht[1]
+        add_to_db_inter( head->key, std::move(head->value), 1); // Move to ht[1]
         delete(head);
         head =next_node;
         
     }
-    dict.ht[0].table[dict.rehasingIndex]=nullptr;
-    if (dict.rehasingIndex + 1 == dict.ht[0].table_size)
+    this->ht[0].table[this->rehasingIndex]=nullptr;
+    if (this->rehasingIndex + 1 == this->ht[0].table_size)
     {
-        dict.rehasing = false;
-        dict.rehasingIndex = -1;
-        free(dict.ht[0].table);
-        dict.ht[0].table = nullptr;
-        dict.ht[0] = dict.ht[1];
-        dict.ht[1] = {nullptr, 0, 0, 0};
+        this->rehasing = false;
+        this->rehasingIndex = -1;
+        free(this->ht[0].table);
+        this->ht[0].table = nullptr;
+        this->ht[0] = this->ht[1];
+        this->ht[1] = {nullptr, 0, 0, 0};
         DB("------------Rehasing Stopped-------------")
     }
-    DB("Rehash-> Added table_index :" + std::to_string(dict.rehasingIndex));
+    DB("Rehash-> Added table_index :" + std::to_string(this->rehasingIndex));
 }
 
-void add_to_db_inter(Dict& dict, const std::string& key,const CusData& value, int deaf ) {
+void Dict::add_to_db_inter( const std::string& key, CusData value, int deaf ) {
     // If rehashing, always add new keys to ht[1]
 
-    int table_index = (dict.rehasing && deaf == 0) ? 1 : deaf;
+    int table_index = (this->rehasing && deaf == 0) ? 1 : deaf;
 
-    size_t hash_index = murmur32(key) & dict.ht[table_index].table_size_mask;
+    size_t hash_index = murmur32(key) & this->ht[table_index].table_size_mask;
     DB("Got hash_index ="+std::to_string(hash_index)+"  in ht["+std::to_string(table_index)+"]")
 
-    DataEntry* head = dict.ht[table_index].table[hash_index];
+    DataEntry* head = this->ht[table_index].table[hash_index];
 
     // Check for the re assing
     if((head!=nullptr)&&(head->key==key))
     {
         DB("DEBUG : Reinit key->"+key+" value->"+cusdata_to_string(head->value)+"->"+cusdata_to_string(value));
-        head->value=value;
+        head->value = std::move(value);
         return;
     }
 
-    if (!dict.rehasing&&head != nullptr && ((head->index >= MAX_BUCKET_CHAIN_LENGTH)||((((double)dict.ht[table_index].element_count)/dict.ht[table_index].table_size)>=1.245f))) {
+    if (!this->rehasing&&head != nullptr && ((head->index >= MAX_BUCKET_CHAIN_LENGTH)||((((double)this->ht[table_index].element_count)/this->ht[table_index].table_size)>=1.245f))) {
         DB("---------Rehashing started----------")
-        dict.rehasing = true;
+        this->rehasing = true;
         increaseHashTable();
-        init_dict(dict, DEFAULT_TABLE_COUNT, 1);
+        init_dict( DEFAULT_TABLE_COUNT, 1);
         DB("( New dict size:"+std::to_string(DEFAULT_TABLE_COUNT)+")")
-        dict.rehasingIndex=-1;
-        rehash(dict);
-        add_to_db_inter(dict,key,value,1);
+        this->rehasingIndex=-1;
+        rehash();
+        add_to_db_inter(key, std::move(value), 1);
         return;
     }
 
     DataEntry* entry = new DataEntry();
     entry->key = key;
-    entry->value = value;
+    entry->value = std::move(value);
     entry->next = head;
     if (head == nullptr) {
         entry->index = 1;
-        dict.ht[table_index].space_used++;
     }
     else {
         entry->index = head->index + 1;
         head->prev=entry;
     }
 
-    dict.ht[table_index].table[hash_index] = entry;
-    dict.ht[table_index].element_count++;
+    this->ht[table_index].table[hash_index] = entry;
+    this->ht[table_index].element_count++;
     DB("DATA ADDED:: base (key->" + key + " value->" + cusdata_to_string(value) + ")");
 }
 
-std::tuple<DataEntry*, int, size_t> get_from_db_inter(Dict& dict, const std::string& key)
+std::tuple<DataEntry*, int, size_t> Dict::get_from_db_inter( const std::string& key)
 {
     size_t hash_index;
     DataEntry* head;
-    if (dict.rehasing) {
-        hash_index = murmur32(key) & dict.ht[1].table_size_mask;
-        head = dict.ht[1].table[hash_index];
-        while (head)
-        {
+    if (rehasing) {
+        hash_index = murmur32(key) & this->ht[1].table_size_mask;
+        head = this->ht[1].table[hash_index];
+        while (head) {
             if (head->key == key) return std::make_tuple(head, 1, hash_index);
             head = head->next;
         }
     }
-    hash_index = murmur32(key) & dict.ht[0].table_size_mask;
-    head = dict.ht[0].table[hash_index];
+    hash_index = murmur32(key) & this->ht[0].table_size_mask;
+    head = this->ht[0].table[hash_index];
     while (head)
     {
         if (head->key == key) return std::make_tuple(head, 0, hash_index);
         head = head->next;
     }
     return std::make_tuple(nullptr, -1, 0);
+}
+
+std::vector<std::string> Dict::get_all_from_db_inter()
+{
+    DataEntry* head;
+    std::vector<std::string> all_entries;
+    for(int x=0; x<this->ht[0].table_size; x++) {
+        DB("DEBUG: get_all_from_db_inter->ht[0] x->"+std::to_string(x));
+        head = this->ht[0].table[x];
+        while (head) {
+            all_entries.push_back(head->key);
+            all_entries.push_back(cusdata_to_string(head->value));
+            DB("DEBUG: get_all_from_db_inter->"+head->key+"->"+cusdata_to_string(head->value));
+            head = head->next;
+        }
+    }
+
+    if (rehasing) {
+        for(int x=0; x<this->ht[1].table_size; x++) {
+            head = this->ht[1].table[x];
+            while (head) {
+                all_entries.push_back(head->key);
+                all_entries.push_back(cusdata_to_string(head->value));
+                DB("DEBUG: get_all_from_db_inter->"+head->key+"->"+cusdata_to_string(head->value));
+                head = head->next;
+            }
+        }
+    }
+    return all_entries;
 }
